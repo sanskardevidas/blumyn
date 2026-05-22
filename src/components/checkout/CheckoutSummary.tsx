@@ -77,9 +77,11 @@ export default function CheckoutSummary({
     discount = Math.min(discount, subtotal);
 
     setAppliedCoupon({
+      id: data.id,
       code: data.code,
       type: data.type,
       value: Number(data.value),
+      active: data.is_active,
     });
 
     setDiscountAmount(discount);

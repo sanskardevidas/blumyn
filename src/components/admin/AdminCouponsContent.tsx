@@ -24,6 +24,7 @@ export default function AdminCouponsContent() {
     e.preventDefault();
 
     addCoupon({
+      id: Date.now().toString(),
       code,
       type,
       value: Number(value),
