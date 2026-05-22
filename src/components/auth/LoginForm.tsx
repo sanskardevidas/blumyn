@@ -30,10 +30,11 @@ export default function LoginForm() {
 
     setLoading(true);
 
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const { data, error: signInError } =
+      await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
 
     if (signInError) {
       setError(signInError.message);
@@ -41,8 +42,15 @@ export default function LoginForm() {
       return;
     }
 
-    setLoading(false);
-    router.push("/account/orders");
+    if (!data.session) {
+      setError("Login session was not created. Please try again.");
+      setLoading(false);
+      return;
+    }
+
+    await supabase.auth.getSession();
+
+    router.replace("/account/orders");
     router.refresh();
   };
 
@@ -71,21 +79,19 @@ export default function LoginForm() {
           </p>
 
           <div className="mt-8 grid gap-4 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
-            {[
-              "Track orders",
-              "Manage subscription",
-              "Saved addresses",
-            ].map((item) => (
-              <div
-                key={item}
-                className="flex items-center gap-3 rounded-[1.5rem] border border-white/70 bg-white/68 px-4 py-4 text-sm font-semibold text-[#70537C] shadow-[0_18px_50px_rgba(91,54,113,0.08)] backdrop-blur-xl"
-              >
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#F7E7F2] text-[#6F3E8F]">
-                  <Sparkles size={18} />
+            {["Track orders", "Manage subscription", "Saved addresses"].map(
+              (item) => (
+                <div
+                  key={item}
+                  className="flex items-center gap-3 rounded-[1.5rem] border border-white/70 bg-white/68 px-4 py-4 text-sm font-semibold text-[#70537C] shadow-[0_18px_50px_rgba(91,54,113,0.08)] backdrop-blur-xl"
+                >
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#F7E7F2] text-[#6F3E8F]">
+                    <Sparkles size={18} />
+                  </div>
+                  {item}
                 </div>
-                {item}
-              </div>
-            ))}
+              )
+            )}
           </div>
         </div>
 
