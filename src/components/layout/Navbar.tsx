@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import {
+  LogIn,
   Menu,
   Search,
   ShoppingCart,
   Sparkles,
-  User,
+  UserPlus,
   X,
 } from "lucide-react";
 import { useState } from "react";
@@ -57,11 +58,19 @@ export default function Navbar() {
           </button>
 
           <Link
-            href="/account"
-            aria-label="Account"
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-white/70 bg-white/60 text-[#6F3E8F] shadow-[0_14px_35px_rgba(122,92,158,0.08)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#6F3E8F] hover:text-white"
+            href="/login"
+            className="flex h-11 items-center gap-2 rounded-full border border-white/70 bg-white/70 px-5 text-sm font-semibold text-[#6F3E8F] shadow-[0_14px_35px_rgba(122,92,158,0.08)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-0.5 hover:bg-white"
           >
-            <User size={19} />
+            <LogIn size={17} />
+            Login
+          </Link>
+
+          <Link
+            href="/register"
+            className="flex h-11 items-center gap-2 rounded-full bg-[#6F3E8F] px-5 text-sm font-semibold text-white shadow-[0_18px_42px_rgba(111,62,143,0.22)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#5E347A]"
+          >
+            <UserPlus size={17} />
+            Register
           </Link>
 
           <Link
@@ -103,6 +112,24 @@ export default function Navbar() {
                   {link.label}
                 </Link>
               ))}
+
+              <Link
+                href="/login"
+                className="flex items-center gap-2 rounded-[1.2rem] px-4 py-3 text-sm font-semibold text-[#70537C] transition-all duration-300 hover:bg-[#6F3E8F] hover:text-white"
+                onClick={() => setMobileOpen(false)}
+              >
+                <LogIn size={18} />
+                Login
+              </Link>
+
+              <Link
+                href="/register"
+                className="flex items-center gap-2 rounded-[1.2rem] bg-[#6F3E8F] px-4 py-3 text-sm font-semibold text-white transition-all duration-300 hover:bg-[#5E347A]"
+                onClick={() => setMobileOpen(false)}
+              >
+                <UserPlus size={18} />
+                Register
+              </Link>
             </div>
 
             <div className="mt-4 flex items-center gap-3 border-t border-[#E6D6F2] px-1 pt-4">
@@ -113,15 +140,6 @@ export default function Navbar() {
               >
                 <Search size={20} />
               </button>
-
-              <Link
-                href="/account"
-                aria-label="Account"
-                className="flex h-11 w-11 items-center justify-center rounded-full border border-[#E6D6F2] bg-white/70 text-[#6F3E8F] transition-all duration-300 active:scale-95"
-                onClick={() => setMobileOpen(false)}
-              >
-                <User size={20} />
-              </Link>
 
               <Link
                 href="/cart"

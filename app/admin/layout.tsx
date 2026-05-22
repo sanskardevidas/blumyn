@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
-const ADMIN_EMAIL = "sanskardevidas@gmail.com";
+const ADMIN_EMAIL = "dherangedevidas2@gmail.com";
 
 export default async function AdminLayout({
   children,
@@ -15,7 +15,7 @@ export default async function AdminLayout({
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login");
+    redirect("/admin/login");
   }
 
   if (user.email !== ADMIN_EMAIL) {
