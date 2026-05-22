@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
+const ADMIN_EMAIL = "sanskardevidas@gmail.com";
+
 export default async function AdminLayout({
   children,
 }: {
@@ -10,21 +12,14 @@ export default async function AdminLayout({
 
   const {
     data: { user },
-    error: userError,
   } = await supabase.auth.getUser();
 
-  if (userError || !user) {
+  if (!user) {
     redirect("/login");
   }
 
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (profileError || profile?.role !== "admin") {
-    redirect("/login");
+  if (user.email !== ADMIN_EMAIL) {
+    redirect("/");
   }
 
   return <>{children}</>;
