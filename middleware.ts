@@ -1,30 +1,7 @@
-import { type NextRequest } from "next/server";
-import { updateSession } from "@/lib/supabase/middleware";
+import { NextResponse, type NextRequest } from "next/server";
 
-export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-
-  const publicRoutes = [
-    "/",
-    "/login",
-    "/register",
-    "/shop",
-    "/contact",
-    "/guide",
-    "/cart",
-    "/checkout",
-  ];
-
-  const isPublicRoute =
-    publicRoutes.includes(pathname) ||
-    pathname.startsWith("/product/") ||
-    pathname.startsWith("/auth/");
-
-  if (isPublicRoute) {
-    return await updateSession(request);
-  }
-
-  return await updateSession(request);
+export function middleware(request: NextRequest) {
+  return NextResponse.next();
 }
 
 export const config = {
