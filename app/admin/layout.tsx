@@ -12,16 +12,17 @@ export default async function AdminLayout({
 
   const {
     data: { user },
+    error,
   } = await supabase.auth.getUser();
 
-  const isAdminLoginPage =
-    typeof children !== "undefined" && false;
-
-  if (!user) {
-    redirect("/admin/login");
+  if (error || !user) {
+    redirect("/login");
   }
 
-  if (user.email !== ADMIN_EMAIL) {
+  const userEmail = user.email?.toLowerCase().trim();
+  const adminEmail = ADMIN_EMAIL.toLowerCase().trim();
+
+  if (userEmail !== adminEmail) {
     redirect("/");
   }
 
