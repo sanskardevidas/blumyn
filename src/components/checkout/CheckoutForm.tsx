@@ -20,7 +20,6 @@ type Address = {
   address_line_1: string;
   address_line_2: string | null;
   city: string;
-  district: string | null;
   state: string;
   pincode: string;
   landmark: string | null;
@@ -60,7 +59,15 @@ export default function CheckoutForm({
   const total = Math.max(subtotal + shipping - safeDiscount, 0);
 
   useEffect(() => {
-    const fetchAddresses = async () => {
+    const fetchInitialData = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user?.email) {
+        setEmail(user.email);
+      }
+
       const { data, error } = await supabase
         .from("addresses")
         .select("*")
@@ -84,7 +91,7 @@ export default function CheckoutForm({
         setHouse(first.address_line_1 || "");
         setStreet(first.address_line_2 || "");
         setCity(first.city || "");
-        setDistrict(first.district || "");
+        setDistrict(first.city || "");
         setState(first.state || "");
         setLandmark(first.landmark || "");
         setPinCode(first.pincode || "");
@@ -94,7 +101,7 @@ export default function CheckoutForm({
       setLoadingAddresses(false);
     };
 
-    fetchAddresses();
+    fetchInitialData();
   }, []);
 
   const handleAddressChange = (id: string) => {
@@ -108,12 +115,17 @@ export default function CheckoutForm({
     setHouse(addr.address_line_1 || "");
     setStreet(addr.address_line_2 || "");
     setCity(addr.city || "");
-    setDistrict(addr.district || "");
+    setDistrict(addr.city || "");
     setState(addr.state || "");
     setLandmark(addr.landmark || "");
     setPinCode(addr.pincode || "");
     setAddressType(addr.address_type || "Home");
   };
+
+  const isUuid = (value: string) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value
+    );
 
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -124,16 +136,50 @@ export default function CheckoutForm({
     setSubmitError("");
 
     try {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        throw new Error("Please login before placing an order.");
+      }
+
+      const { data: addressData, error: addressError } = await supabase
+        .from("addresses")
+        .insert({
+          user_id: user.id,
+          full_name: fullName,
+          phone,
+          address_line_1: house,
+          address_line_2: street,
+          city,
+          state,
+          pincode: pinCode,
+          landmark: landmark || null,
+          is_default: false,
+          address_type: addressType,
+        })
+        .select("id")
+        .single();
+
+      if (addressError || !addressData) {
+        throw addressError || new Error("Failed to save address");
+      }
+
       const { data: orderData, error: orderError } = await supabase
         .from("orders")
         .insert({
+          user_id: user.id,
+          address_id: addressData.id,
           subtotal,
           discount: safeDiscount,
+          shipping,
           total,
           coupon_code: appliedCoupon?.code || null,
           coupon_type: appliedCoupon?.type || null,
           coupon_value: appliedCoupon?.value || null,
-          coupon_discount_amount: appliedCoupon ? safeDiscount : null,
+          coupon_discount_amount: appliedCoupon ? safeDiscount : 0,
           status: "pending",
           email,
         })
@@ -146,7 +192,7 @@ export default function CheckoutForm({
 
       const itemsPayload = cartItems.map((item) => ({
         order_id: orderData.id,
-        product_id: item.id,
+        product_id: isUuid(String(item.id)) ? String(item.id) : null,
         product_name: item.name,
         product_price: item.price,
         quantity: item.quantity,
@@ -170,7 +216,7 @@ export default function CheckoutForm({
           phone,
         },
         address: {
-          id: selectedAddressId || `manual-${Date.now()}`,
+          id: addressData.id,
           fullName,
           phone,
           house,
@@ -201,9 +247,11 @@ export default function CheckoutForm({
       clearCart();
       clearCoupon();
       setOrderPlaced(true);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Order placement error:", error);
-      setSubmitError("Failed to place order. Please try again.");
+      setSubmitError(
+        error?.message || "Failed to place order. Please try again."
+      );
     } finally {
       setSubmitting(false);
     }
