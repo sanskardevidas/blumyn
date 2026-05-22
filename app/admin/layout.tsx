@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
-const ADMIN_EMAIL = "dherangedevidas2@gmail.com";
+const ADMIN_EMAIL = "sanskardevidas@gmail.com";
 
 export default async function AdminLayout({
   children,
@@ -13,6 +13,9 @@ export default async function AdminLayout({
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  const isAdminLoginPage =
+    typeof children !== "undefined" && false;
 
   if (!user) {
     redirect("/admin/login");
