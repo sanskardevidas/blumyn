@@ -2,17 +2,15 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { LockKeyhole, LogIn, Mail, Sparkles } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
-export default function LoginForm() {
-  const router = useRouter();
+const ADMIN_EMAIL = "sanskardevidas@gmail.com";
 
+export default function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -30,9 +28,11 @@ export default function LoginForm() {
 
     setLoading(true);
 
+    const normalizedEmail = email.trim().toLowerCase();
+
     const { data, error: signInError } =
       await supabase.auth.signInWithPassword({
-        email: email.trim(),
+        email: normalizedEmail,
         password,
       });
 
@@ -42,7 +42,7 @@ export default function LoginForm() {
       return;
     }
 
-    if (!data.session) {
+    if (!data.user || !data.session) {
       setError("Login session was not created. Please try again.");
       setLoading(false);
       return;
@@ -50,16 +50,19 @@ export default function LoginForm() {
 
     await supabase.auth.getSession();
 
-    router.replace("/account/orders");
-    router.refresh();
+    const userEmail = data.user.email?.toLowerCase().trim();
+
+    if (userEmail === ADMIN_EMAIL.toLowerCase().trim()) {
+      window.location.href = "/admin";
+      return;
+    }
+
+    window.location.href = "/account/orders";
   };
 
   return (
     <section className="relative isolate overflow-hidden bg-[#FFF9FB] py-16 md:py-24">
       <div className="absolute inset-0 -z-30 bg-[radial-gradient(circle_at_14%_8%,rgba(255,226,236,0.92),transparent_34%),radial-gradient(circle_at_86%_18%,rgba(226,208,245,0.88),transparent_34%),radial-gradient(circle_at_50%_92%,rgba(255,240,201,0.42),transparent_32%),linear-gradient(180deg,#FFF9FB_0%,#FFF7FA_45%,#F8F0FF_100%)]" />
-
-      <div className="absolute -left-32 top-0 -z-20 h-[28rem] w-[28rem] rounded-full bg-[#FFE2EC] blur-[120px]" />
-      <div className="absolute -right-32 bottom-0 -z-20 h-[30rem] w-[30rem] rounded-full bg-[#DEC8F5] blur-[130px]" />
 
       <div className="mx-auto grid max-w-7xl items-center gap-10 px-4 sm:px-6 lg:grid-cols-[1fr_0.9fr] lg:gap-14">
         <div>
@@ -74,12 +77,12 @@ export default function LoginForm() {
           </h1>
 
           <p className="max-w-xl text-base leading-8 text-[#70537C] md:text-lg">
-            Access your orders, subscriptions, saved addresses, and everything
-            you need in one calm and comfortable place.
+            Access your orders, subscriptions, saved addresses, and admin panel
+            if you are logging in as admin.
           </p>
 
           <div className="mt-8 grid gap-4 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
-            {["Track orders", "Manage subscription", "Saved addresses"].map(
+            {["Track orders", "Manage subscription", "Admin access"].map(
               (item) => (
                 <div
                   key={item}
@@ -97,9 +100,6 @@ export default function LoginForm() {
 
         <div>
           <div className="relative overflow-hidden rounded-[2.5rem] border border-white/70 bg-white/58 p-7 shadow-[0_35px_100px_rgba(91,54,113,0.16)] backdrop-blur-2xl md:p-10">
-            <div className="absolute -right-14 -top-14 h-40 w-40 rounded-full bg-[#F7E7F2] blur-3xl" />
-            <div className="absolute -left-10 bottom-0 h-32 w-32 rounded-full bg-[#FFEAC7]/40 blur-3xl" />
-
             <div className="relative">
               <h2 className="mb-2 text-4xl leading-tight text-[#553268]">
                 Login
@@ -126,7 +126,7 @@ export default function LoginForm() {
                       placeholder="Enter your email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="h-14 w-full rounded-[1.2rem] border border-[#E6D6F2] bg-[#FFF8FC]/80 py-3 pl-11 pr-4 text-sm text-[#70537C] outline-none transition-all duration-300 placeholder:text-[#A58AB6] focus:border-[#B18AD7] focus:bg-white"
+                      className="h-14 w-full rounded-2xl border border-[#E7D9EF] bg-white/80 pl-12 pr-4 text-sm text-[#553268] outline-none transition-all duration-300 focus:border-[#7A5C9E]"
                     />
                   </div>
                 </div>
@@ -147,7 +147,7 @@ export default function LoginForm() {
                       placeholder="Enter your password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="h-14 w-full rounded-[1.2rem] border border-[#E6D6F2] bg-[#FFF8FC]/80 py-3 pl-11 pr-4 text-sm text-[#70537C] outline-none transition-all duration-300 placeholder:text-[#A58AB6] focus:border-[#B18AD7] focus:bg-white"
+                      className="h-14 w-full rounded-2xl border border-[#E7D9EF] bg-white/80 pl-12 pr-4 text-sm text-[#553268] outline-none transition-all duration-300 focus:border-[#7A5C9E]"
                     />
                   </div>
                 </div>
@@ -158,42 +158,41 @@ export default function LoginForm() {
                       type="checkbox"
                       checked={rememberMe}
                       onChange={(e) => setRememberMe(e.target.checked)}
-                      className="accent-[#6F3E8F]"
                     />
                     Remember me
                   </label>
 
                   <Link
-                    href="/"
-                    className="text-sm font-semibold text-[#6F3E8F] hover:underline"
+                    href="/forgot-password"
+                    className="text-sm font-semibold text-[#7A5C9E] hover:underline"
                   >
                     Forgot password?
                   </Link>
                 </div>
 
                 {error && (
-                  <p className="rounded-[1rem] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+                  <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
                     {error}
-                  </p>
+                  </div>
                 )}
 
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex w-full items-center justify-center gap-2 rounded-full border border-[#6F3E8F] bg-[#6F3E8F] px-6 py-4 text-sm font-semibold text-white shadow-[0_20px_45px_rgba(111,62,143,0.25)] transition-all duration-300 hover:-translate-y-1 hover:bg-[#5E347A] disabled:cursor-not-allowed disabled:opacity-70"
+                  className="flex h-14 w-full items-center justify-center gap-2 rounded-full bg-[#7A5C9E] px-6 text-sm font-bold text-white shadow-[0_18px_45px_rgba(122,92,158,0.24)] transition-all duration-300 hover:scale-[1.01] disabled:cursor-not-allowed disabled:opacity-70"
                 >
                   <LogIn size={18} />
                   {loading ? "Logging in..." : "Login"}
                 </button>
               </form>
 
-              <p className="mt-6 text-center text-sm text-[#70537C]">
-                Don’t have an account?{" "}
+              <p className="mt-7 text-center text-sm text-[#70537C]">
+                Don&apos;t have an account?{" "}
                 <Link
                   href="/register"
-                  className="font-semibold text-[#6F3E8F] hover:underline"
+                  className="font-bold text-[#7A5C9E] hover:underline"
                 >
-                  Create one
+                  Create account
                 </Link>
               </p>
             </div>

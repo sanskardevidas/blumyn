@@ -9,7 +9,7 @@ const testimonials = [
     name: "Anjali",
     city: "Delhi",
     quote: "No more fear of leaks",
-    video: "/videos/testimonial1.mp4",
+    video: "/videos/thumb1.mp4",
     thumbnail: "/videos/thumb1.jpg",
   },
   {
@@ -17,7 +17,7 @@ const testimonials = [
     name: "Nisha",
     city: "Bangalore",
     quote: "Finally something so soft",
-    video: "/videos/testimonial2.mp4",
+    video: "/videos/thumb2.mp4",
     thumbnail: "/videos/thumb2.jpg",
   },
   {
@@ -25,7 +25,7 @@ const testimonials = [
     name: "Meera",
     city: "Mumbai",
     quote: "I feel confident now",
-    video: "/videos/testimonial3.mp4",
+    video: "/videos/thumb3.mp4",
     thumbnail: "/videos/thumb3.jpg",
   },
   {
@@ -33,7 +33,7 @@ const testimonials = [
     name: "Shruti",
     city: "Pune",
     quote: "Gentle comfort all day",
-    video: "/videos/testimonial4.mp4",
+    video: "/videos/thumb4.mp4",
     thumbnail: "/videos/thumb4.jpg",
   },
   {
@@ -41,7 +41,7 @@ const testimonials = [
     name: "Riya",
     city: "Hyderabad",
     quote: "It feels lighter and safer",
-    video: "/videos/testimonial5.mp4",
+    video: "/videos/thumb5.mp4",
     thumbnail: "/videos/thumb5.jpg",
   },
   {
@@ -49,7 +49,7 @@ const testimonials = [
     name: "Priya",
     city: "Chennai",
     quote: "Perfect for long days",
-    video: "/videos/testimonial6.mp4",
+    video: "/videos/thumb6.mp4",
     thumbnail: "/videos/thumb6.jpg",
   },
 ];
