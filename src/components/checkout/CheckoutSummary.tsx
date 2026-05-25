@@ -19,14 +19,49 @@ export default function CheckoutSummary({
   discountAmount,
   setDiscountAmount,
 }: CheckoutSummaryProps) {
-  const { subtotal } = useCart();
+  const { cartItems, subtotal } = useCart();
 
   const [couponCode, setCouponCode] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const shipping = subtotal > 0 ? 50 : 0;
-  const total = Math.max(subtotal + shipping - discountAmount, 0);
+  const totalQuantity = cartItems.reduce(
+    (total, item) => total + item.quantity,
+    0
+  );
+
+  const shipping = totalQuantity === 1 ? 50 : 0;
+
+  const autoDiscountPercentage =
+    totalQuantity >= 5
+      ? 20
+      : totalQuantity === 4
+      ? 15
+      : totalQuantity === 3
+      ? 10
+      : totalQuantity === 2
+      ? 5
+      : 0;
+
+  const autoDiscountAmount = Math.round(
+    (subtotal * autoDiscountPercentage) / 100
+  );
+
+  const couponDiscountAmount = Math.min(discountAmount, subtotal);
+
+  const finalDiscountAmount = Math.max(
+    autoDiscountAmount,
+    couponDiscountAmount
+  );
+
+  const finalDiscountLabel =
+    couponDiscountAmount > autoDiscountAmount && appliedCoupon
+      ? `Coupon (${appliedCoupon.code})`
+      : autoDiscountPercentage > 0
+      ? `Bulk Offer (${autoDiscountPercentage}% OFF)`
+      : "Discount";
+
+  const total = Math.max(subtotal + shipping - finalDiscountAmount, 0);
 
   const applyCoupon = async () => {
     const cleanedCode = couponCode.trim();
@@ -44,10 +79,6 @@ export default function CheckoutSummary({
       .select("*")
       .ilike("code", cleanedCode)
       .maybeSingle();
-
-    console.log("Coupon search:", cleanedCode);
-    console.log("Coupon data:", data);
-    console.log("Coupon error:", error);
 
     setLoading(false);
 
@@ -111,7 +142,7 @@ export default function CheckoutSummary({
               Order Summary
             </h2>
             <p className="mt-1 text-sm text-[#70537C]">
-              Review total, shipping, and coupon savings.
+              Review total, shipping, coupon savings, and quantity offers.
             </p>
           </div>
         </div>
@@ -171,19 +202,37 @@ export default function CheckoutSummary({
 
         <div className="space-y-4 rounded-[1.75rem] border border-[#E6D6F2] bg-white/70 p-5 text-sm text-[#70537C]">
           <div className="flex justify-between">
+            <span>Total Items</span>
+            <span className="font-semibold text-[#553268]">
+              {totalQuantity}
+            </span>
+          </div>
+
+          <div className="flex justify-between">
             <span>Subtotal</span>
             <span className="font-semibold text-[#553268]">₹{subtotal}</span>
           </div>
 
           <div className="flex justify-between">
             <span>Shipping</span>
-            <span className="font-semibold text-[#553268]">₹{shipping}</span>
+            <span className="font-semibold text-[#553268]">
+              {shipping === 0 ? "Free" : `₹${shipping}`}
+            </span>
           </div>
 
           <div className="flex justify-between text-green-600">
-            <span>Discount</span>
-            <span className="font-semibold">-₹{discountAmount}</span>
+            <span>{finalDiscountLabel}</span>
+            <span className="font-semibold">-₹{finalDiscountAmount}</span>
           </div>
+
+          {autoDiscountAmount > 0 &&
+            couponDiscountAmount > 0 &&
+            couponDiscountAmount <= autoDiscountAmount && (
+              <p className="rounded-[1rem] border border-[#E6D6F2] bg-[#FFF8FC] px-4 py-2 text-xs leading-5 text-[#70537C]">
+                Bulk offer gives better/equal savings than coupon, so bulk
+                offer is applied.
+              </p>
+            )}
 
           <div className="mt-5 flex justify-between border-t border-[#E6D6F2] pt-5 text-xl font-semibold text-[#553268]">
             <span>Total</span>

@@ -23,7 +23,7 @@ type Address = {
   state: string;
   pincode: string;
   landmark: string | null;
-  is_default?: boolean | null;
+  address_type: string | null;
 };
 
 export default function CheckoutForm({
@@ -47,53 +47,68 @@ export default function CheckoutForm({
   const [state, setState] = useState("");
   const [landmark, setLandmark] = useState("");
   const [pinCode, setPinCode] = useState("");
-  const [addressType, setAddressType] = useState<"Home" | "Office" | "Other">(
-    "Home"
-  );
+  const [addressType, setAddressType] = useState("Home");
 
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [loadingAddresses, setLoadingAddresses] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
-  const shipping = cartItems.length > 0 ? 50 : 0;
-  const safeDiscount = Math.min(discountAmount, subtotal);
-  const total = Math.max(subtotal + shipping - safeDiscount, 0);
+  const totalQuantity = cartItems.reduce(
+    (total, item) => total + item.quantity,
+    0
+  );
 
-  const inputClass =
-    "h-14 w-full rounded-[1.2rem] border border-[#E6D6F2] bg-[#FFF8FC]/80 px-5 text-sm text-[#70537C] outline-none transition-all duration-300 placeholder:text-[#A58AB6] focus:border-[#B18AD7] focus:bg-white";
+  const shipping = totalQuantity === 1 ? 50 : 0;
 
-  const isUuid = (value: string) =>
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-      value
-    );
+  const autoDiscountPercentage =
+    totalQuantity >= 5
+      ? 20
+      : totalQuantity === 4
+      ? 15
+      : totalQuantity === 3
+      ? 10
+      : totalQuantity === 2
+      ? 5
+      : 0;
+
+  const autoDiscountAmount = Math.round(
+    (subtotal * autoDiscountPercentage) / 100
+  );
+
+  const couponDiscountAmount = Math.min(discountAmount, subtotal);
+
+  const finalDiscountAmount = Math.max(
+    autoDiscountAmount,
+    couponDiscountAmount
+  );
+
+  const finalDiscountLabel =
+    couponDiscountAmount > autoDiscountAmount && appliedCoupon
+      ? `Coupon: ${appliedCoupon.code}`
+      : autoDiscountPercentage > 0
+      ? `Bulk Offer: ${autoDiscountPercentage}% OFF`
+      : "No discount";
+
+  const total = Math.max(subtotal + shipping - finalDiscountAmount, 0);
 
   useEffect(() => {
     const fetchInitialData = async () => {
-      setLoadingAddresses(true);
-
       const {
         data: { user },
       } = await supabase.auth.getUser();
 
-      if (user?.email) setEmail(user.email);
-
-      if (!user) {
-        setLoadingAddresses(false);
-        return;
+      if (user?.email) {
+        setEmail(user.email);
       }
 
       const { data, error } = await supabase
         .from("addresses")
-        .select(
-          "id, full_name, phone, address_line_1, address_line_2, city, state, pincode, landmark, is_default"
-        )
-        .eq("user_id", user.id)
-        .order("is_default", { ascending: false })
+        .select("*")
         .order("created_at", { ascending: false });
 
       if (error) {
-        console.error("Error fetching addresses:", error.message);
+        console.error("Error fetching addresses:", error);
         setLoadingAddresses(false);
         return;
       }
@@ -102,8 +117,19 @@ export default function CheckoutForm({
       setAddresses(fetchedAddresses);
 
       if (fetchedAddresses.length > 0) {
-        fillAddress(fetchedAddresses[0]);
-        setSelectedAddressId(fetchedAddresses[0].id);
+        const first = fetchedAddresses[0];
+
+        setSelectedAddressId(first.id);
+        setFullName(first.full_name || "");
+        setPhone(first.phone || "");
+        setHouse(first.address_line_1 || "");
+        setStreet(first.address_line_2 || "");
+        setCity(first.city || "");
+        setDistrict(first.city || "");
+        setState(first.state || "");
+        setLandmark(first.landmark || "");
+        setPinCode(first.pincode || "");
+        setAddressType(first.address_type || "Home");
       }
 
       setLoadingAddresses(false);
@@ -112,7 +138,12 @@ export default function CheckoutForm({
     fetchInitialData();
   }, []);
 
-  const fillAddress = (addr: Address) => {
+  const handleAddressChange = (id: string) => {
+    setSelectedAddressId(id);
+
+    const addr = addresses.find((a) => a.id === id);
+    if (!addr) return;
+
     setFullName(addr.full_name || "");
     setPhone(addr.phone || "");
     setHouse(addr.address_line_1 || "");
@@ -122,18 +153,13 @@ export default function CheckoutForm({
     setState(addr.state || "");
     setLandmark(addr.landmark || "");
     setPinCode(addr.pincode || "");
-    setAddressType("Home");
+    setAddressType(addr.address_type || "Home");
   };
 
-  const handleAddressChange = (id: string) => {
-    setSelectedAddressId(id);
-    const addr = addresses.find((a) => a.id === id);
-    if (addr) fillAddress(addr);
-  };
-
-  const markAsNewAddress = () => {
-    if (selectedAddressId) setSelectedAddressId("");
-  };
+  const isUuid = (value: string) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      value
+    );
 
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -153,91 +179,90 @@ export default function CheckoutForm({
         throw new Error("Please login before placing an order.");
       }
 
-      const userEmail = user.email || email;
+      const { data: addressData, error: addressError } = await supabase
+        .from("addresses")
+        .insert({
+          user_id: user.id,
+          full_name: fullName,
+          phone,
+          address_line_1: house,
+          address_line_2: street,
+          city,
+          state,
+          pincode: pinCode,
+          landmark: landmark || null,
+          is_default: false,
+          address_type: addressType,
+        })
+        .select("id")
+        .single();
 
-      const { error: profileError } = await supabase.from("profiles").upsert({
-        id: user.id,
-        full_name: fullName,
-        email: userEmail,
-        phone,
-        updated_at: new Date().toISOString(),
-      });
-
-      if (profileError) throw profileError;
-
-      let finalAddressId = selectedAddressId;
-
-      if (!finalAddressId) {
-        const { data: addressData, error: addressError } = await supabase
-          .from("addresses")
-          .insert({
-            user_id: user.id,
-            full_name: fullName,
-            phone,
-            address_line_1: house,
-            address_line_2: street || null,
-            city,
-            state,
-            pincode: pinCode,
-            landmark: landmark || null,
-            is_default: addresses.length === 0,
-          })
-          .select("id")
-          .single();
-
-        if (addressError || !addressData) {
-          throw addressError || new Error("Failed to save address.");
-        }
-
-        finalAddressId = addressData.id;
+      if (addressError || !addressData) {
+        throw addressError || new Error("Failed to save address");
       }
 
       const { data: orderData, error: orderError } = await supabase
         .from("orders")
         .insert({
           user_id: user.id,
-          address_id: finalAddressId,
+          address_id: addressData.id,
           subtotal,
-          discount: safeDiscount,
+          discount: finalDiscountAmount,
+          shipping,
           total,
-          coupon_code: appliedCoupon?.code || null,
-          coupon_type: appliedCoupon?.type || null,
-          coupon_value: appliedCoupon?.value || null,
-          coupon_discount_amount: appliedCoupon ? safeDiscount : 0,
+          coupon_code:
+            couponDiscountAmount > autoDiscountAmount && appliedCoupon
+              ? appliedCoupon.code
+              : null,
+          coupon_type:
+            couponDiscountAmount > autoDiscountAmount && appliedCoupon
+              ? appliedCoupon.type
+              : null,
+          coupon_value:
+            couponDiscountAmount > autoDiscountAmount && appliedCoupon
+              ? appliedCoupon.value
+              : null,
+          coupon_discount_amount:
+            couponDiscountAmount > autoDiscountAmount && appliedCoupon
+              ? couponDiscountAmount
+              : 0,
           status: "pending",
+          email,
         })
-        .select("id, created_at")
+        .select("id")
         .single();
 
       if (orderError || !orderData) {
-        throw orderError || new Error("Failed to create order.");
+        throw orderError || new Error("Failed to create order");
       }
 
-      const itemsPayload = cartItems.map((item: any) => ({
+      const itemsPayload = cartItems.map((item) => ({
         order_id: orderData.id,
         product_id: isUuid(String(item.id)) ? String(item.id) : null,
         product_name: item.name,
-        product_price: Number(item.price || 0),
-        quantity: Number(item.quantity || 1),
-        size: item.size || null,
+        product_price: item.price,
+        quantity: item.quantity,
+        size: null,
       }));
 
       const { error: itemsError } = await supabase
         .from("order_items")
         .insert(itemsPayload);
 
-      if (itemsError) throw itemsError;
+      if (itemsError) {
+        throw itemsError;
+      }
 
       addOrder({
         id: orderData.id,
         items: cartItems,
         profile: {
           fullName,
-          email: userEmail,
+          email,
           phone,
         },
         address: {
-          id: finalAddressId,
+          id: addressData.id,
           fullName,
           phone,
           house,
@@ -247,22 +272,23 @@ export default function CheckoutForm({
           state,
           landmark,
           pinCode,
-          addressType,
+          addressType: addressType as any,
         },
         subtotal,
-        discount: safeDiscount,
+        discount: finalDiscountAmount,
         shipping,
         total,
-        appliedCoupon: appliedCoupon
-          ? {
-              code: appliedCoupon.code,
-              type: appliedCoupon.type,
-              value: appliedCoupon.value,
-              discountAmount: safeDiscount,
-            }
-          : null,
+        appliedCoupon:
+          couponDiscountAmount > autoDiscountAmount && appliedCoupon
+            ? {
+                code: appliedCoupon.code,
+                type: appliedCoupon.type,
+                value: appliedCoupon.value,
+                discountAmount: couponDiscountAmount,
+              }
+            : null,
         status: "Processing",
-        createdAt: orderData.created_at || new Date().toISOString(),
+        createdAt: new Date().toISOString(),
       });
 
       clearCart();
@@ -278,9 +304,14 @@ export default function CheckoutForm({
     }
   };
 
+  const inputClass =
+    "h-14 w-full rounded-[1.2rem] border border-[#E6D6F2] bg-[#FFF8FC]/80 px-5 text-sm text-[#70537C] outline-none transition-all duration-300 placeholder:text-[#A58AB6] focus:border-[#B18AD7] focus:bg-white";
+
   if (orderPlaced) {
     return (
       <div className="relative overflow-hidden rounded-[2.25rem] border border-white/70 bg-white/72 p-8 shadow-[0_30px_90px_rgba(91,54,113,0.12)] backdrop-blur-2xl md:p-10">
+        <div className="absolute -right-12 -top-12 h-36 w-36 rounded-full bg-[#F7E7F2] blur-3xl" />
+
         <div className="relative">
           <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#F7E7F2] text-[#6F3E8F]">
             <CheckCircle size={30} />
@@ -291,8 +322,8 @@ export default function CheckoutForm({
           </h2>
 
           <p className="text-base leading-8 text-[#70537C]">
-            Your order is now saved in Supabase and will appear in the admin
-            dashboard.
+            Thank you for choosing Blumyn. Your order has been placed
+            successfully.
           </p>
         </div>
       </div>
@@ -300,10 +331,10 @@ export default function CheckoutForm({
   }
 
   return (
-    <form
-      onSubmit={handlePlaceOrder}
-      className="relative overflow-hidden rounded-[2.25rem] border border-white/70 bg-white/68 p-6 shadow-[0_30px_90px_rgba(91,54,113,0.12)] backdrop-blur-2xl md:p-8"
-    >
+    <div className="relative overflow-hidden rounded-[2.25rem] border border-white/70 bg-white/68 p-6 shadow-[0_30px_90px_rgba(91,54,113,0.12)] backdrop-blur-2xl md:p-8">
+      <div className="absolute -right-14 -top-14 h-40 w-40 rounded-full bg-[#F7E7F2] blur-3xl" />
+      <div className="absolute -left-12 bottom-0 h-32 w-32 rounded-full bg-[#FFEAC7]/40 blur-3xl" />
+
       <div className="relative">
         <div className="mb-6 flex items-start gap-4">
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F7E7F2] text-[#6F3E8F]">
@@ -320,172 +351,237 @@ export default function CheckoutForm({
           </div>
         </div>
 
-        {loadingAddresses ? (
-          <p className="mb-6 rounded-[1.2rem] border border-[#E6D6F2] bg-[#FFF8FC]/80 px-5 py-4 text-sm text-[#70537C]">
-            Loading saved addresses...
-          </p>
-        ) : addresses.length > 0 ? (
-          <div className="mb-6">
+        <div className="mb-6 rounded-[1.5rem] border border-[#E6D6F2] bg-[#FFF8FC]/80 p-5 text-sm text-[#70537C]">
+          <div className="mb-3 flex justify-between">
+            <span>Total Items</span>
+            <span className="font-semibold text-[#553268]">
+              {totalQuantity}
+            </span>
+          </div>
+
+          <div className="mb-3 flex justify-between">
+            <span>Subtotal</span>
+            <span className="font-semibold text-[#553268]">₹{subtotal}</span>
+          </div>
+
+          <div className="mb-3 flex justify-between">
+            <span>Shipping</span>
+            <span className="font-semibold text-[#553268]">
+              {shipping === 0 ? "Free" : `₹${shipping}`}
+            </span>
+          </div>
+
+          <div className="mb-3 flex justify-between">
+            <span>{finalDiscountLabel}</span>
+            <span className="font-semibold text-green-600">
+              -₹{finalDiscountAmount}
+            </span>
+          </div>
+
+          <div className="mt-4 flex justify-between border-t border-[#E6D6F2] pt-4 text-lg font-semibold text-[#6F3E8F]">
+            <span>Total</span>
+            <span>₹{total}</span>
+          </div>
+        </div>
+
+        <form onSubmit={handlePlaceOrder} className="space-y-6">
+          {loadingAddresses ? (
+            <div className="rounded-[1.2rem] border border-[#E6D6F2] bg-[#FFF8FC] p-4 text-sm text-[#70537C]">
+              Loading saved addresses...
+            </div>
+          ) : addresses.length > 0 ? (
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-[#553268]">
+                Choose Saved Address
+              </label>
+
+              <select
+                value={selectedAddressId}
+                onChange={(e) => handleAddressChange(e.target.value)}
+                className={inputClass}
+              >
+                {addresses.map((addr) => (
+                  <option key={addr.id} value={addr.id}>
+                    {addr.full_name} - {addr.city}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
+
+          <div className="grid gap-5 md:grid-cols-2">
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-[#553268]">
+                Full Name
+              </label>
+              <input
+                type="text"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                required
+                className={inputClass}
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-[#553268]">
+                Phone
+              </label>
+              <input
+                type="text"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                required
+                className={inputClass}
+              />
+            </div>
+          </div>
+
+          <div>
             <label className="mb-2 block text-sm font-semibold text-[#553268]">
-              Use Saved Address
+              Email
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              className={inputClass}
+            />
+          </div>
+
+          <div className="grid gap-5 md:grid-cols-2">
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-[#553268]">
+                House / Flat Number
+              </label>
+              <input
+                type="text"
+                value={house}
+                onChange={(e) => setHouse(e.target.value)}
+                required
+                className={inputClass}
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-[#553268]">
+                Street / Area
+              </label>
+              <input
+                type="text"
+                value={street}
+                onChange={(e) => setStreet(e.target.value)}
+                required
+                className={inputClass}
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-5 md:grid-cols-2">
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-[#553268]">
+                City
+              </label>
+              <input
+                type="text"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                required
+                className={inputClass}
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-[#553268]">
+                District
+              </label>
+              <input
+                type="text"
+                value={district}
+                onChange={(e) => setDistrict(e.target.value)}
+                required
+                className={inputClass}
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-5 md:grid-cols-3">
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-[#553268]">
+                State
+              </label>
+              <input
+                type="text"
+                value={state}
+                onChange={(e) => setState(e.target.value)}
+                required
+                className={inputClass}
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-[#553268]">
+                Landmark
+              </label>
+              <input
+                type="text"
+                value={landmark}
+                onChange={(e) => setLandmark(e.target.value)}
+                className={inputClass}
+              />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-semibold text-[#553268]">
+                PIN Code
+              </label>
+              <input
+                type="text"
+                value={pinCode}
+                onChange={(e) => setPinCode(e.target.value)}
+                required
+                className={inputClass}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-sm font-semibold text-[#553268]">
+              Address Type
             </label>
 
             <select
-              value={selectedAddressId}
-              onChange={(e) => handleAddressChange(e.target.value)}
+              value={addressType}
+              onChange={(e) => setAddressType(e.target.value)}
               className={inputClass}
             >
-              {addresses.map((address) => (
-                <option key={address.id} value={address.id}>
-                  {address.full_name}, {address.address_line_1}, {address.city}
-                </option>
-              ))}
+              <option value="Home">Home</option>
+              <option value="Office">Office</option>
+              <option value="Other">Other</option>
             </select>
           </div>
-        ) : null}
 
-        <div className="grid gap-5 md:grid-cols-2">
-          <input
-            className={inputClass}
-            placeholder="Full Name"
-            value={fullName}
-            onChange={(e) => {
-              setFullName(e.target.value);
-              markAsNewAddress();
-            }}
-            required
-          />
+          {submitError && (
+            <div className="rounded-[1.2rem] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+              {submitError}
+            </div>
+          )}
 
-          <input
-            className={inputClass}
-            placeholder="Phone"
-            value={phone}
-            onChange={(e) => {
-              setPhone(e.target.value);
-              markAsNewAddress();
-            }}
-            required
-          />
-
-          <input
-            className={`${inputClass} md:col-span-2`}
-            placeholder="Email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-
-          <input
-            className={inputClass}
-            placeholder="House / Flat / Building"
-            value={house}
-            onChange={(e) => {
-              setHouse(e.target.value);
-              markAsNewAddress();
-            }}
-            required
-          />
-
-          <input
-            className={inputClass}
-            placeholder="Street / Area"
-            value={street}
-            onChange={(e) => {
-              setStreet(e.target.value);
-              markAsNewAddress();
-            }}
-          />
-
-          <input
-            className={inputClass}
-            placeholder="City"
-            value={city}
-            onChange={(e) => {
-              setCity(e.target.value);
-              markAsNewAddress();
-            }}
-            required
-          />
-
-          <input
-            className={inputClass}
-            placeholder="District"
-            value={district}
-            onChange={(e) => setDistrict(e.target.value)}
-          />
-
-          <input
-            className={inputClass}
-            placeholder="State"
-            value={state}
-            onChange={(e) => {
-              setState(e.target.value);
-              markAsNewAddress();
-            }}
-            required
-          />
-
-          <input
-            className={inputClass}
-            placeholder="Pin Code"
-            value={pinCode}
-            onChange={(e) => {
-              setPinCode(e.target.value);
-              markAsNewAddress();
-            }}
-            required
-          />
-
-          <input
-            className={`${inputClass} md:col-span-2`}
-            placeholder="Landmark"
-            value={landmark}
-            onChange={(e) => {
-              setLandmark(e.target.value);
-              markAsNewAddress();
-            }}
-          />
-        </div>
-
-        <div className="mt-6">
-          <label className="mb-3 block text-sm font-semibold text-[#553268]">
-            Address Type
-          </label>
-
-          <div className="flex flex-wrap gap-3">
-            {["Home", "Office", "Other"].map((type) => (
-              <button
-                key={type}
-                type="button"
-                onClick={() => setAddressType(type as any)}
-                className={`rounded-full border px-5 py-2.5 text-sm font-semibold transition-all duration-300 ${
-                  addressType === type
-                    ? "border-[#6F3E8F] bg-[#6F3E8F] text-white"
-                    : "border-[#E6D6F2] bg-white/80 text-[#70537C] hover:bg-[#FFF8FC]"
-                }`}
-              >
-                {type}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {submitError && (
-          <p className="mt-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
-            {submitError}
-          </p>
-        )}
-
-        <button
-          type="submit"
-          disabled={submitting || cartItems.length === 0}
-          className="mt-8 flex h-14 w-full items-center justify-center gap-2 rounded-full bg-[#6F3E8F] text-sm font-bold text-white shadow-[0_18px_45px_rgba(111,62,143,0.22)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#5E347A] disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <PackageCheck size={18} />
-          {submitting ? "Placing Order..." : `Place Order ₹${total}`}
-        </button>
+          <button
+            type="submit"
+            disabled={cartItems.length === 0 || submitting}
+            className={`flex w-full items-center justify-center gap-2 rounded-full px-6 py-4 text-sm font-semibold text-white transition-all duration-300 ${
+              cartItems.length > 0 && !submitting
+                ? "bg-[#6F3E8F] shadow-[0_20px_45px_rgba(111,62,143,0.25)] hover:-translate-y-1 hover:bg-[#5E347A]"
+                : "cursor-not-allowed bg-[#DCCBE8]"
+            }`}
+          >
+            <PackageCheck size={18} />
+            {submitting ? "Placing Order..." : "Place Order"}
+          </button>
+        </form>
       </div>
-    </form>
+    </div>
   );
 }
