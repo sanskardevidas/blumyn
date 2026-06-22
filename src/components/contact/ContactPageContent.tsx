@@ -62,7 +62,7 @@ export default function ContactPageContent() {
               {
                 icon: Mail,
                 title: "Email",
-                text: "contact@support.com",
+                text: "contact@blumyn.shop",
               },
               {
                 icon: MessageCircle,
