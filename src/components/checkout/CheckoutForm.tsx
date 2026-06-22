@@ -228,7 +228,10 @@ export default function CheckoutForm({
               : 0,
           status: "pending",
           email,
-        })
+          payment_method: "cod",
+          payment_status: "pending",
+          payment_gateway: "cash_on_delivery",
+          transaction_id: null,})
         .select("id")
         .single();
 
