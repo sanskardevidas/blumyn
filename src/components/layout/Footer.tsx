@@ -135,6 +135,8 @@ export default function Footer() {
             <Link href="/terms-and-conditions">Terms & Conditions</Link>
             <Link href="/refund-policy">Refund Policy</Link>
             <Link href="/shipping-policy">Shipping Policy</Link>
+            <Link href="/return-policy">Return Policy</Link>
+
           </div>
 
           <div className="mt-6 border-t border-[#E6D6F2] pt-4 text-center text-sm text-[#70537C] md:mt-9 md:pt-6">
