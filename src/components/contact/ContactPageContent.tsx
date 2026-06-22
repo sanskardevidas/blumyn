@@ -72,7 +72,7 @@ export default function ContactPageContent() {
               {
                 icon: MapPin,
                 title: "Location",
-                text: "Pune, Maharashtra, India",
+                text: "101-Aai Height, Pargaon, Tarfe Ale,\nJunnar, Pune, Maharashtra – 410504,\nIndia",
               },
             ].map((item) => {
               const Icon = item.icon;

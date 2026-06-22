@@ -34,6 +34,7 @@ export default function ReturnPolicyPage() {
       <p>Email: contact@blumyn.shop</p>
       <p>Phone: +91 8766589805</p>
       <p>Website: https://www.blumyn.shop</p>
+      <p>Address : 101-Aai Height, Pargaon, Tarfe Ale, Junnar, Pune, Maharashtra – 410504, India</p>
     </main>
   );
 }
