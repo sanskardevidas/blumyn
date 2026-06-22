@@ -115,7 +115,7 @@ export default function RefundPolicyPage() {
               </p>
               <p>Email: contact@blumyn.shop</p>
               <p>Phone: +91 8766589805</p>
-              <p>Website: https://www.blumyn.shop/</p>
+              <p>Website: https://www.blumyn.shop</p>
             </div>
           </section>
         </div>
