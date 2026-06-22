@@ -103,7 +103,7 @@ export default function Footer() {
                 <div className="space-y-2 text-sm text-[#70537C] md:space-y-3">
                   <div className="flex items-center gap-2">
                     <Mail size={15} className="text-[#6F3E8F]" />
-                    <span>contact@blumyn.com</span>
+                    <span>contact@blumyn.shop</span>
                   </div>
 
                   <div className="flex items-center gap-2">
