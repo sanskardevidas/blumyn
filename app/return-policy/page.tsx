@@ -25,6 +25,7 @@ export default function ReturnPolicyPage() {
       <p>
         Return requests must be raised within 48 hours of delivery with
         supporting photos.
+        If the return is approved replacement will be arranged and product will be delivered within 7 to 10 days of approval.
       </p>
 
       <h2 className="text-2xl font-semibold mt-8 mb-4">
