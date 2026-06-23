@@ -17,7 +17,7 @@ export default function TermsAndConditionsPage() {
             </h2>
 
             <p>
-              By accessing or using the Blumyn website, you agree to be bound
+              By accessing or using the Blumyn website managed by "SAKSHAM UNIQUE BUSINESS PVT LTD.", you agree to be bound
               by these Terms & Conditions. If you do not agree with any part of
               these terms, please do not use our website or services.
             </p>
