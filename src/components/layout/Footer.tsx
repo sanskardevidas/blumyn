@@ -69,27 +69,6 @@ export default function Footer() {
                   >
                     Contact
                   </Link>
-
-                  <Link
-                    href="/"
-                    className="block transition hover:text-[#6F3E8F]"
-                  >
-                    Shipping
-                  </Link>
-
-                  <Link
-                    href="/"
-                    className="block transition hover:text-[#6F3E8F]"
-                  >
-                    Privacy
-                  </Link>
-
-                  <Link
-                    href="/"
-                    className="block transition hover:text-[#6F3E8F]"
-                  >
-                    Refund
-                  </Link>
                 </div>
               </div>
             </div>
