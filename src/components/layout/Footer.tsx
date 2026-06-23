@@ -119,7 +119,7 @@ export default function Footer() {
           </div>
 
           <div className="mt-6 border-t border-[#E6D6F2] pt-4 text-center text-sm text-[#70537C] md:mt-9 md:pt-6">
-            © 2026 Blumyn. All rights reserved.
+            © 2026 Blumyn. Powered By "SAKSHAM UNIQUE BUSINESS PRIVATE LIMITED". All rights reserved.
           </div>
         </div>
       </div>
