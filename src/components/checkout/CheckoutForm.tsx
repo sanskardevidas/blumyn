@@ -228,10 +228,11 @@ export default function CheckoutForm({
               : 0,
           status: "pending",
           email,
-          payment_method: "cod",
+          payment_method: "phonepe",
           payment_status: "pending",
-          payment_gateway: "cash_on_delivery",
-          transaction_id: null,})
+          payment_gateway: "phonepe",
+          transaction_id: null,
+        })
         .select("id")
         .single();
 
@@ -256,47 +257,18 @@ export default function CheckoutForm({
         throw itemsError;
       }
 
-      addOrder({
-        id: orderData.id,
-        items: cartItems,
-        profile: {
-          fullName,
-          email,
-          phone,
-        },
-        address: {
-          id: addressData.id,
-          fullName,
-          phone,
-          house,
-          street,
-          city,
-          district,
-          state,
-          landmark,
-          pinCode,
-          addressType: addressType as any,
-        },
-        subtotal,
-        discount: finalDiscountAmount,
-        shipping,
-        total,
-        appliedCoupon:
-          couponDiscountAmount > autoDiscountAmount && appliedCoupon
-            ? {
-                code: appliedCoupon.code,
-                type: appliedCoupon.type,
-                value: appliedCoupon.value,
-                discountAmount: couponDiscountAmount,
-              }
-            : null,
-        status: "Processing",
-        createdAt: new Date().toISOString(),
-      });
+      const { data: paymentData, error: paymentError } =
+        await supabase.functions.invoke("create-phonepe-payment", {
+          body: {
+            orderId: orderData.id,
+          },
+        });
 
-      clearCart();
-      clearCoupon();
-      setOrderPlaced(true);
+      if (paymentError || !paymentData?.paymentUrl) {
+        throw paymentError || new Error("Failed to start PhonePe payment.");
+      }
+
+      window.location.href = paymentData.paymentUrl;
     } catch (error: any) {
       console.error("Order placement error:", error);
       setSubmitError(
@@ -581,7 +553,7 @@ export default function CheckoutForm({
             }`}
           >
             <PackageCheck size={18} />
-            {submitting ? "Placing Order..." : "Place Order"}
+            {submitting ? "Redirecting to PhonePe..." : "Pay with PhonePe"}
           </button>
         </form>
       </div>
