@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { Coupon } from "@/types/coupon";
-import { CheckCircle, MapPin, PackageCheck } from "lucide-react";
+import { MapPin, PackageCheck } from "lucide-react";
 import { useCart } from "@/context/CartContext";
 import { useOrders } from "@/context/OrderContext";
 import { supabase } from "@/lib/supabaseClient";
@@ -32,7 +32,6 @@ export default function CheckoutForm({
   clearCoupon,
 }: CheckoutFormProps) {
   const { cartItems, clearCart, subtotal } = useCart();
-  const { addOrder } = useOrders();
 
   const [addresses, setAddresses] = useState<Address[]>([]);
   const [selectedAddressId, setSelectedAddressId] = useState("");
@@ -49,7 +48,6 @@ export default function CheckoutForm({
   const [pinCode, setPinCode] = useState("");
   const [addressType, setAddressType] = useState("Home");
 
-  const [orderPlaced, setOrderPlaced] = useState(false);
   const [loadingAddresses, setLoadingAddresses] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -162,148 +160,108 @@ export default function CheckoutForm({
     );
 
   const handlePlaceOrder = async (e: React.FormEvent) => {
-    e.preventDefault();
+  e.preventDefault();
 
-    if (cartItems.length === 0 || submitting) return;
+  if (cartItems.length === 0 || submitting) return;
 
-    setSubmitting(true);
-    setSubmitError("");
+  setSubmitting(true);
+  setSubmitError("");
 
-    try {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
+  try {
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
 
-      if (userError || !user) {
-        throw new Error("Please login before placing an order.");
-      }
+    if (userError || !user) {
+      throw new Error("Please login before placing an order.");
+    }
 
-      const { data: addressData, error: addressError } = await supabase
-        .from("addresses")
-        .insert({
-          user_id: user.id,
-          full_name: fullName,
-          phone,
-          address_line_1: house,
-          address_line_2: street,
-          city,
-          state,
-          pincode: pinCode,
-          landmark: landmark || null,
-          is_default: false,
-          address_type: addressType,
-        })
-        .select("id")
-        .single();
-
-      if (addressError || !addressData) {
-        throw addressError || new Error("Failed to save address");
-      }
-
-      const { data: orderData, error: orderError } = await supabase
-        .from("orders")
-        .insert({
-          user_id: user.id,
-          address_id: addressData.id,
+    const { data: pendingOrder, error: pendingError } = await supabase
+      .from("pending_orders")
+      .insert({
+        user_id: user.id,
+        amount: total,
+        payment_status: "pending",
+        payload: {
+          address: {
+            fullName,
+            phone,
+            house,
+            street,
+            city,
+            district,
+            state,
+            landmark,
+            pinCode,
+            addressType,
+          },
+          profile: {
+            email,
+          },
+          cartItems,
           subtotal,
           discount: finalDiscountAmount,
           shipping,
           total,
-          coupon_code:
-            couponDiscountAmount > autoDiscountAmount && appliedCoupon
-              ? appliedCoupon.code
-              : null,
-          coupon_type:
-            couponDiscountAmount > autoDiscountAmount && appliedCoupon
-              ? appliedCoupon.type
-              : null,
-          coupon_value:
-            couponDiscountAmount > autoDiscountAmount && appliedCoupon
-              ? appliedCoupon.value
-              : null,
-          coupon_discount_amount:
-            couponDiscountAmount > autoDiscountAmount && appliedCoupon
-              ? couponDiscountAmount
-              : 0,
-          status: "pending",
-          email,
-          payment_method: "phonepe",
-          payment_status: "pending",
-          payment_gateway: "phonepe",
-          transaction_id: null,
-        })
-        .select("id")
-        .single();
-
-      if (orderError || !orderData) {
-        throw orderError || new Error("Failed to create order");
-      }
-
-      const itemsPayload = cartItems.map((item) => ({
-        order_id: orderData.id,
-        product_id: isUuid(String(item.id)) ? String(item.id) : null,
-        product_name: item.name,
-        product_price: item.price,
-        quantity: item.quantity,
-        size: null,
-      }));
-
-      const { error: itemsError } = await supabase
-        .from("order_items")
-        .insert(itemsPayload);
-
-      if (itemsError) {
-        throw itemsError;
-      }
-
-      const { data: paymentData, error: paymentError } =
-        await supabase.functions.invoke("create-phonepe-payment", {
-          body: {
-            orderId: orderData.id,
+          coupon: {
+            code:
+              couponDiscountAmount > autoDiscountAmount && appliedCoupon
+                ? appliedCoupon.code
+                : null,
+            type:
+              couponDiscountAmount > autoDiscountAmount && appliedCoupon
+                ? appliedCoupon.type
+                : null,
+            value:
+              couponDiscountAmount > autoDiscountAmount && appliedCoupon
+                ? appliedCoupon.value
+                : null,
+            discountAmount:
+              couponDiscountAmount > autoDiscountAmount && appliedCoupon
+                ? couponDiscountAmount
+                : 0,
           },
-        });
+        },
+      })
+      .select("id")
+      .single();
 
-      if (paymentError || !paymentData?.paymentUrl) {
-        throw paymentError || new Error("Failed to start PhonePe payment.");
-      }
-
-      window.location.href = paymentData.paymentUrl;
-    } catch (error: any) {
-      console.error("Order placement error:", error);
-      setSubmitError(
-        error?.message || "Failed to place order. Please try again."
-      );
-    } finally {
-      setSubmitting(false);
+    if (pendingError || !pendingOrder) {
+      throw pendingError || new Error("Failed to prepare payment.");
     }
-  };
+
+    const { data: paymentData, error: paymentError } =
+      await supabase.functions.invoke("create-phonepe-payment", {
+        body: {
+          pendingOrderId: pendingOrder.id,
+        },
+      });
+
+    if (paymentError || !paymentData?.paymentUrl) {
+      await supabase
+        .from("pending_orders")
+        .update({
+          payment_status: "failed",
+        })
+        .eq("id", pendingOrder.id);
+
+      throw paymentError || new Error("Failed to start PhonePe payment.");
+    }
+
+    window.location.href = paymentData.paymentUrl;
+  } catch (error: any) {
+    console.error("Payment start error:", error);
+    setSubmitError(
+      error?.message || "Failed to start payment. Please try again."
+    );
+  } finally {
+    setSubmitting(false);
+  }
+};
 
   const inputClass =
     "h-14 w-full rounded-[1.2rem] border border-[#E6D6F2] bg-[#FFF8FC]/80 px-5 text-sm text-[#70537C] outline-none transition-all duration-300 placeholder:text-[#A58AB6] focus:border-[#B18AD7] focus:bg-white";
-
-  if (orderPlaced) {
-    return (
-      <div className="relative overflow-hidden rounded-[2.25rem] border border-white/70 bg-white/72 p-8 shadow-[0_30px_90px_rgba(91,54,113,0.12)] backdrop-blur-2xl md:p-10">
-        <div className="absolute -right-12 -top-12 h-36 w-36 rounded-full bg-[#F7E7F2] blur-3xl" />
-
-        <div className="relative">
-          <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#F7E7F2] text-[#6F3E8F]">
-            <CheckCircle size={30} />
-          </div>
-
-          <h2 className="mb-4 text-3xl text-[#553268]">
-            Order placed successfully 💜
-          </h2>
-
-          <p className="text-base leading-8 text-[#70537C]">
-            Thank you for choosing Blumyn. Your order has been placed
-            successfully.
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="relative overflow-hidden rounded-[2.25rem] border border-white/70 bg-white/68 p-6 shadow-[0_30px_90px_rgba(91,54,113,0.12)] backdrop-blur-2xl md:p-8">

@@ -21,39 +21,50 @@ serve(async (req) => {
       });
     }
 
-    const { orderId } = await req.json();
+    const { pendingOrderId } = await req.json();
 
-    if (!orderId) {
-      throw new Error("Missing orderId");
+    if (!pendingOrderId) {
+      throw new Error("Missing pendingOrderId");
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
-    const phonepeClientId = Deno.env.get("PHONEPE_CLIENT_ID")!;
-    const phonepeClientSecret = Deno.env.get("PHONEPE_CLIENT_SECRET")!;
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+    const phonepeClientId = Deno.env.get("PHONEPE_CLIENT_ID");
+    const phonepeClientSecret = Deno.env.get("PHONEPE_CLIENT_SECRET");
     const phonepeClientVersion = Deno.env.get("PHONEPE_CLIENT_VERSION") || "1";
     const siteUrl = Deno.env.get("SITE_URL") || "https://www.blumyn.shop";
 
+    if (
+      !supabaseUrl ||
+      !supabaseServiceRoleKey ||
+      !phonepeClientId ||
+      !phonepeClientSecret
+    ) {
+      throw new Error("Missing required server secrets");
+    }
+
     const supabase = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-    const { data: order, error: orderError } = await supabase
-      .from("orders")
-      .select("id,total,email,user_id")
-      .eq("id", orderId)
+    const { data: pendingOrder, error: pendingError } = await supabase
+      .from("pending_orders")
+      .select("id,amount,payload,user_id")
+      .eq("id", pendingOrderId)
       .single();
 
-    if (orderError || !order) {
-      throw new Error("Order not found");
+    if (pendingError || !pendingOrder) {
+      throw new Error("Pending order not found");
     }
 
-    const amountInPaise = Math.round(Number(order.total) * 100);
+    const amountInPaise = Math.round(Number(pendingOrder.amount) * 100);
 
     if (!amountInPaise || amountInPaise <= 0) {
-      throw new Error("Invalid order amount");
+      throw new Error("Invalid payment amount");
     }
 
-    const merchantOrderId = `BLUMYN_${order.id.replaceAll("-", "")}_${Date.now()}`;
+    const merchantOrderId = `BLUMYN_${String(pendingOrder.id).replaceAll(
+      "-",
+      ""
+    )}_${Date.now()}`;
 
     const tokenResponse = await fetch(
       "https://api.phonepe.com/apis/identity-manager/v1/oauth/token",
@@ -78,20 +89,25 @@ serve(async (req) => {
       throw new Error("Failed to authenticate with PhonePe");
     }
 
+    const email =
+      pendingOrder?.payload?.profile?.email ||
+      pendingOrder?.payload?.email ||
+      "";
+
     const paymentPayload = {
       merchantOrderId,
       amount: amountInPaise,
       expireAfter: 1200,
       metaInfo: {
-        udf1: order.id,
-        udf2: order.email || "",
+        udf1: pendingOrder.id,
+        udf2: email,
         udf3: "Blumyn Order",
       },
       paymentFlow: {
         type: "PG_CHECKOUT",
         message: "Payment for Blumyn order",
         merchantUrls: {
-          redirectUrl: `${siteUrl}/payment-status?order_id=${order.id}&merchant_order_id=${merchantOrderId}`,
+          redirectUrl: `${siteUrl}/payment-status?pending_order_id=${pendingOrder.id}&merchant_order_id=${merchantOrderId}`,
         },
       },
     };
@@ -112,6 +128,14 @@ serve(async (req) => {
 
     if (!paymentResponse.ok) {
       console.error("PhonePe payment error:", paymentData);
+
+      await supabase
+        .from("pending_orders")
+        .update({
+          payment_status: "failed",
+        })
+        .eq("id", pendingOrder.id);
+
       throw new Error(
         paymentData?.message || "Failed to create PhonePe payment"
       );
@@ -124,23 +148,30 @@ serve(async (req) => {
 
     if (!redirectUrl) {
       console.error("Missing PhonePe redirect URL:", paymentData);
+
+      await supabase
+        .from("pending_orders")
+        .update({
+          payment_status: "failed",
+        })
+        .eq("id", pendingOrder.id);
+
       throw new Error("PhonePe did not return payment URL");
     }
 
     await supabase
-      .from("orders")
+      .from("pending_orders")
       .update({
-        payment_method: "phonepe",
-        payment_gateway: "phonepe",
+        merchant_order_id: merchantOrderId,
         payment_status: "pending",
-        transaction_id: merchantOrderId,
       })
-      .eq("id", order.id);
+      .eq("id", pendingOrder.id);
 
     return new Response(
       JSON.stringify({
         success: true,
         paymentUrl: redirectUrl,
+        pendingOrderId: pendingOrder.id,
         merchantOrderId,
       }),
       {

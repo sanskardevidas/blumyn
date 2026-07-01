@@ -28,6 +28,7 @@ type SupabaseOrder = {
   coupon_value: number | null;
   coupon_discount_amount: number | null;
   status: string;
+  payment_status: string | null;
   created_at: string;
 };
 
@@ -61,9 +62,29 @@ type SupabaseProfile = {
 };
 
 function mapStatus(status: string): Order["status"] {
-  if (status === "shipped" || status === "out_for_delivery") return "Shipped";
-  if (status === "delivered") return "Delivered";
-  return "Processing";
+  switch (status) {
+    case "pending":
+      return "Processing";
+
+    case "confirmed":
+      return "Processing";
+
+    case "packed":
+      return "Processing";
+
+    case "shipped":
+    case "out_for_delivery":
+      return "Shipped";
+
+    case "delivered":
+      return "Delivered";
+
+    case "cancelled":
+      return "Processing"; // We won't show these anyway because of the payment_status filter
+
+    default:
+      return "Processing";
+  }
 }
 
 function normalizeOrder(order: any): Order {
@@ -206,7 +227,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
       const { data: ordersData, error: ordersError } = await supabase
         .from("orders")
         .select(
-          "id,user_id,address_id,subtotal,discount,total,coupon_code,coupon_type,coupon_value,coupon_discount_amount,status,created_at"
+          "id,user_id,address_id,subtotal,discount,total,coupon_code,coupon_type,coupon_value,coupon_discount_amount,status,payment_status,created_at"
         )
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
@@ -220,8 +241,14 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      const orderIds = ordersData.map((order) => order.id);
-      const addressIds = ordersData
+      const paidOrdersData = (ordersData as SupabaseOrder[]).filter(
+        (order) =>
+          order.payment_status === "paid" ||
+        order.payment_status === "success"
+      );
+      
+      const orderIds = paidOrdersData.map((order) => order.id);
+      const addressIds = paidOrdersData
         .map((order) => order.address_id)
         .filter(Boolean) as string[];
 
@@ -253,7 +280,7 @@ export function OrderProvider({ children }: { children: React.ReactNode }) {
         addressesData = (fetchedAddresses || []) as SupabaseAddress[];
       }
 
-      const mappedOrders = (ordersData as SupabaseOrder[]).map((order) => {
+      const mappedOrders = paidOrdersData.map((order) => {
         const orderItems = ((itemsData || []) as SupabaseOrderItem[]).filter(
           (item) => item.order_id === order.id
         );
